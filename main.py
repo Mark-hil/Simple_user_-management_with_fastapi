@@ -13,8 +13,8 @@ app = FastAPI()
 
 
 # Redis connection using redis-py
-REDIS_URL = "redis://localhost:6379"
-redis_client = redis.asyncio.from_url(REDIS_URL)
+REDIS_URL = "redis://redis:6379/0"
+redis_client = redis.asyncio.from_url(REDIS_URL,decode_responses=True)
 # ------------------- Static Users -------------------
 static_users = {
     1: {"name": "mark", "email": "mark@example.com", "age": 25},
@@ -33,8 +33,8 @@ class UserCreate(BaseModel):
 class UserResponse(UserCreate):
     id: int
     class Config:
-        orm_mode = True
-
+        from_attributes = True
+        
 # ----------- Static User Endpoints -----------
 @app.get("/static-users/", response_model=List[UserResponse])
 def get_static_users():
@@ -66,15 +66,19 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
 async def get_users(db: AsyncSession = Depends(get_db)):
     cache_key = "all_users"
     
+    print("-----attemting-----")
     # Check if data exists in Redis
     cached_users = await redis_client.get(cache_key)
+    print("-----connected to redis----")
     if cached_users:
+        print("----redis was reached--------")
         # Deserialize from JSON to Python list of users
         users = json.loads(cached_users)
         return {"message": "Data from Redis Cache", "users": users}
-
+    print("-----attemting to db------")
     # Fetch from database if not in cache
     result = await db.execute(select(User))
+    print("-------db was reached--------")
     users = result.scalars().all()
 
     # Convert list of users to JSON
