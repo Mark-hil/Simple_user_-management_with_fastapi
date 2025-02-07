@@ -175,6 +175,7 @@ async def delete_dynamic_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
     return {"message": "User deleted successfully and cache refreshed"}
 
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
