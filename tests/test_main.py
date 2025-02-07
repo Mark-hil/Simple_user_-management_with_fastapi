@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from main import app, redis_client
 from database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from models import User, Base
+from models import Base
 
 # Mocked database for testing
 DATABASE_URL = "postgresql+asyncpg://fastapi_user:password@localhost:5432/fastapi_db"
