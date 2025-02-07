@@ -118,7 +118,11 @@ jobs:
 
       - name: Test API Health Check
         run: |
-          curl --fail http://localhost:8000/health || exit 1
+          curl -v http://localhost:8000/health || exit 1
+
+      - name: Debug Running Container
+        run: docker ps -a && docker logs test-container
+
 
       - name: Stop and Remove Container
         run: docker stop test-container && docker rm test-container

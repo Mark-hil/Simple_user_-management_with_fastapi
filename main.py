@@ -174,3 +174,7 @@ async def delete_dynamic_user(user_id: int, db: AsyncSession = Depends(get_db)):
     await redis_client.setex(cache_key, 600, user_data_json)  # 600 seconds = 10 minutes
 
     return {"message": "User deleted successfully and cache refreshed"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
