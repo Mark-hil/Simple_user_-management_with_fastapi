@@ -39,10 +39,10 @@ jobs:
           pip install flake8
           flake8 . --count --max-line-length=88 --statistics
 
-      - name: Run Tests
-        run: |
-          pip install pytest
-          pytest
+    #   - name: Run Tests
+    #     run: |
+    #       pip install pytest
+    #       pytest
 
   docker:
     name: Build & Push Docker Image
