@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import redis
 import json
+
 # from cors import configure_cors
 
 app = FastAPI()
@@ -14,7 +15,7 @@ app = FastAPI()
 
 # Redis connection using redis-py
 REDIS_URL = "redis://redis:6379/0"
-redis_client = redis.asyncio.from_url(REDIS_URL,decode_responses=True)
+redis_client = redis.asyncio.from_url(REDIS_URL, decode_responses=True)
 # ------------------- Static Users -------------------
 static_users = {
     1: {"name": "mark", "email": "mark@example.com", "age": 25},
@@ -24,21 +25,26 @@ static_users = {
     5: {"name": "esi", "email": "esi@example.com", "age": 26},
 }
 
+
 # Pydantic Models
 class UserCreate(BaseModel):
     name: str
     email: str
     age: Optional[int] = None
 
+
 class UserResponse(UserCreate):
     id: int
+
     class Config:
         from_attributes = True
-        
+
+
 # ----------- Static User Endpoints -----------
 @app.get("/static-users/", response_model=List[UserResponse])
 def get_static_users():
     return [{"id": user_id, **user} for user_id, user in static_users.items()]
+
 
 @app.get("/static-users/{user_id}", response_model=UserResponse)
 def get_static_user(user_id: int):
@@ -46,6 +52,7 @@ def get_static_user(user_id: int):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"id": user_id, **user}
+
 
 # ----------- Dynamic User Endpoints (PostgreSQL) -----------
 @app.post("/dynamic-users/", response_model=UserResponse)
@@ -60,12 +67,13 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
     return new_user
 
+
 # Get all users
 # ------------------- Get Users with Redis Caching -------------------
 @app.get("/dynamic-users/", response_model=dict)
 async def get_users(db: AsyncSession = Depends(get_db)):
     cache_key = "all_users"
-    
+
     print("-----attemting-----")
     # Check if data exists in Redis
     cached_users = await redis_client.get(cache_key)
@@ -89,9 +97,10 @@ async def get_users(db: AsyncSession = Depends(get_db)):
     user_data_json = json.dumps(user_data)  # Serialize list to JSON string
 
     # Cache in Redis for 10 minutes
-    await redis_client.setex(cache_key,600, user_data_json)  # 600 seconds = 10 minutes
+    await redis_client.setex(cache_key, 600, user_data_json)  # 600 seconds = 10 minutes
 
     return {"message": "Data from PostgreSQL", "users": user_data}
+
 
 # Get a single user by ID
 @app.get("/dynamic-users/{user_id}", response_model=UserResponse)
@@ -110,13 +119,18 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
 
     # Cache user data in Redis for 10 minutes
-    user_data = UserResponse(id=user.id, name=user.name, email=user.email, age=user.age).json()
+    user_data = UserResponse(
+        id=user.id, name=user.name, email=user.email, age=user.age
+    ).json()
     await redis.setex(cache_key, 600, user_data)  # 600 sec = 10 min
 
     return UserResponse(id=user.id, name=user.name, email=user.email, age=user.age)
 
+
 @app.put("/dynamic-users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: int, user: UserCreate, db: AsyncSession = Depends(get_db)):
+async def update_user(
+    user_id: int, user: UserCreate, db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(User).filter(User.id == user_id))
     existing_user = result.scalar_one_or_none()
     if not existing_user:
@@ -129,11 +143,12 @@ async def update_user(user_id: int, user: UserCreate, db: AsyncSession = Depends
     await db.refresh(existing_user)
     return existing_user
 
+
 # ------------------- Delete User with Redis Cache -------------------
 @app.delete("/dynamic-users/{user_id}", status_code=200)
 async def delete_dynamic_user(user_id: int, db: AsyncSession = Depends(get_db)):
     cache_key = "all_users"
-    
+
     # Check if user exists in database
     result = await db.execute(select(User).filter(User.id == user_id))
     db_user = result.scalar_one_or_none()
