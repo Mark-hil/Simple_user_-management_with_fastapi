@@ -9,14 +9,19 @@ from models import User, Base
 # Mocked database for testing
 DATABASE_URL = "postgresql+asyncpg://fastapi_user:password@localhost:5432/fastapi_db"
 engine = create_async_engine(DATABASE_URL, echo=True)
-TestingSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+TestingSessionLocal = async_sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
+
 
 # Override the database dependency
 async def override_get_db():
     async with TestingSessionLocal() as session:
         yield session
 
+
 app.dependency_overrides[get_db] = override_get_db
+
 
 # Mock Redis client
 @pytest.fixture(scope="function")
@@ -24,6 +29,7 @@ async def mock_redis():
     await redis_client.flushdb()  # Clear Redis before each test
     yield redis_client
     await redis_client.flushdb()  # Clear Redis after each test
+
 
 # Async test client for FastAPI
 @pytest.fixture(scope="module")
@@ -41,7 +47,9 @@ async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
+
 # ---------------------- TESTS ----------------------
+
 
 @pytest.mark.asyncio
 async def test_create_user_for_tests(client):
@@ -51,15 +59,18 @@ async def test_create_user_for_tests(client):
     assert response.status_code == 200
     assert response.json()["name"] == "John"
 
+
 @pytest.mark.asyncio
 async def test_get_static_users(client):
     response = await client.get("/static-users/")
     assert response.status_code == 200
 
+
 @pytest.mark.asyncio
 async def test_get_static_user_not_found(client):
     response = await client.get("/static-users/")  # Non-existent user ID
     assert response.status_code == 404
+
 
 @pytest.mark.asyncio
 async def test_create_dynamic_user(client):
@@ -67,6 +78,7 @@ async def test_create_dynamic_user(client):
     response = await client.post("/dynamic-users/", json=user_data)
     assert response.status_code == 200
     assert response.json()["name"] == "Jane"
+
 
 @pytest.mark.asyncio
 async def test_get_dynamic_users_from_db(client, mock_redis):
@@ -77,6 +89,7 @@ async def test_get_dynamic_users_from_db(client, mock_redis):
     assert response.json()["message"] == "Data from PostgreSQL"
     cached_users = await mock_redis.get("all_users")
     assert cached_users is not None
+
 
 @pytest.mark.asyncio
 async def test_get_dynamic_users_from_redis(client, mock_redis):
@@ -89,16 +102,19 @@ async def test_get_dynamic_users_from_redis(client, mock_redis):
     assert response.status_code == 200
     assert cached_users is not None
 
+
 @pytest.mark.asyncio
 async def test_get_user_not_found(client):
     response = await client.get("/dynamic-users/")  # Non-existent ID
     assert response.status_code == 404
+
 
 @pytest.mark.asyncio
 async def test_update_user(client):
     user_data = {"name": "Updated", "email": "updated@example.com", "age": 28}
     response = await client.put("/dynamic-users/1", json=user_data)
     assert response.status_code in [200, 404]  # Allow for "not found" cases
+
 
 @pytest.mark.asyncio
 async def test_delete_user(client, mock_redis):
