@@ -11,7 +11,7 @@ on:
       - main
 
 jobs:
-  install-dependencies:
+  install:
     name: Install Dependencies
     runs-on: ubuntu-latest
     steps:
@@ -28,52 +28,83 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-  format-code:
-    name: Format Code with Black
+  lint:
+    name: Run Linting
     runs-on: ubuntu-latest
-    needs: install-dependencies
+    needs: install
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Black
-        run: pip install black
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-      - name: Run Black
+      - name: Install Linting Tools
+        run: pip install black flake8
+
+      - name: Format Code with Black
         run: black . --check
 
-  lint-code:
-    name: Lint with Flake8
-    runs-on: ubuntu-latest
-    needs: install-dependencies
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Flake8
-        run: pip install flake8
-
-      - name: Run Flake8
+      - name: Lint with Flake8
         run: flake8 . --count --max-line-length=88 --statistics
 
-  run-tests:
+  test:
     name: Run Tests
     runs-on: ubuntu-latest
-    needs: install-dependencies
+    needs: install
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Pytest
-        run: pip install pytest
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    #   - name: Run Tests
-    #     run: pytest
+      - name: Install Testing Tools
+        run: pip install pytest httpx
 
-  build:
-    name: Build Docker Image
+      - name: Run Tests
+        run: pytest
+
+  build-and-test-container:
+    name: Build & Test Docker Container
     runs-on: ubuntu-latest
-    needs: [format-code, lint-code, run-tests]
+    needs: [test, lint]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Image Tag
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            echo "IMAGE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "IMAGE_VERSION=latest" >> $GITHUB_ENV
+          fi
+
+      - name: Build Docker Image
+        run: |
+          docker build -t simple-user-management-fastapi-app:${IMAGE_VERSION} .
+
+      - name: Start Docker Container
+        run: |
+          docker run -d -p 8000:8000 --name test-container simple-user-management-fastapi-app:${IMAGE_VERSION}
+          sleep 5  # Wait for the container to start
+
+      - name: Test API Health Check
+        run: |
+          curl --fail http://localhost:8000/health || exit 1
+
+      - name: Stop and Remove Container
+        run: docker stop test-container && docker rm test-container
+
+  push:
+    name: Push Docker Image to Docker Hub
+    runs-on: ubuntu-latest
+    needs: build-and-test-container  # Ensure the container test passed before pushing
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -92,53 +123,12 @@ jobs:
             echo "IMAGE_VERSION=latest" >> $GITHUB_ENV
           fi
 
-      - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION} .
-
-  test-container:
-    name: Test Docker Container
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Debug Image Version
+      - name: Build and Push Docker Image
         run: |
-            echo "Using image version: ${IMAGE_VERSION}"
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION}
 
-      - name: Start Docker Container
-        run: |
-          docker run -d -p 8000:8000 --name test-container ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION}
-          sleep 5  # Wait for the container to start
-
-      - name: Test API Health Check
-        run: |
-          curl --fail http://localhost:8000/health || exit 1
-
-      - name: Stop and Remove Container
-        run: docker stop test-container && docker rm test-container
-
-  push-image:
-    name: Push Docker Image
-    runs-on: ubuntu-latest
-    needs: test-container
-    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Push Docker Image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION}
-
-      - name: Push Latest Tag (if on main)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          docker tag ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:${IMAGE_VERSION} ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:latest
+          if [[ "$IMAGE_VERSION" == "latest" ]]; then
+            docker tag ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:latest ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:latest
+            docker push ${{ secrets.DOCKER_USERNAME }}/simple-user-management-fastapi-app:latest
+          fi
