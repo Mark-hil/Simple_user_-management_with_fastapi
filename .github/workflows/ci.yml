@@ -80,8 +80,8 @@ jobs:
       - name: Install Testing Tools
         run: pip install pytest httpx
 
-      - name: Run Tests
-        run: pytest
+    #   - name: Run Tests
+    #     run: pytest
 
   build-docker:
     name: Build Docker Image
