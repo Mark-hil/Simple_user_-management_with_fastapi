@@ -18,7 +18,7 @@ REDIS_URL = "redis://redis:6379/0"
 redis_client = redis.asyncio.from_url(REDIS_URL, decode_responses=True)
 # ------------------- Static Users -------------------
 static_users = {
-    1: {"name": "mark", "email": "mark@example.com", "age": 25},
+    1: {"name": "mark", "email": "mark@example.com", "age": 20},
     2: {"name": "kofi", "email": "kofi@example.com", "age": 30},
     3: {"name": "ama", "email": "ama@example.com", "age": 22},
     4: {"name": "kwame", "email": "kwame@example.com", "age": 28},
