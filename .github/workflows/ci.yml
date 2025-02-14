@@ -124,6 +124,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install Docker Compose  # <-- FIX: Install docker-compose
+        run: |
+          sudo apt-get update && sudo apt-get install -y docker-compose
+          sudo docker-compose --version
+
       - name: Download Docker Image
         uses: actions/download-artifact@v4
         with:
@@ -132,20 +137,17 @@ jobs:
       - name: Load Docker Image
         run: docker load -i image.tar
 
-      - name: Start Docker Compose Services
+      - name: Start Services with Docker Compose
         run: |
           docker-compose up -d
           sleep 5  # Wait for services to start
 
       - name: Test API Health Check
-        run: |
-          curl --fail http://localhost:8000/health || exit 1
+        run: curl --fail http://localhost:8000/health || exit 1
 
-      - name: Debug Running Containers
-        run: docker ps -a && docker logs $(docker ps -q --filter "name=app")
-
-      - name: Stop Docker Compose Services
+      - name: Stop and Remove Containers
         run: docker-compose down
+
 
   push-docker:
     name: Push Docker Image
