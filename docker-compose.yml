@@ -21,8 +21,7 @@ services:
 
 
   app:
-    image: simple-user-management-fastapi-app
-    build: .
+    image: markhill97/simple-user-management-fastapi-app 
     container_name: fastapi
     restart: always
     depends_on:
