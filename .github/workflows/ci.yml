@@ -91,6 +91,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
       - name: Set Image Tag
         run: |
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
